@@ -1,0 +1,62 @@
+name: Xtreme OS Limbo Builder
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Build Tools
+        run: |
+          sudo apt update
+          sudo apt install -y live-build xorriso squashfs-tools
+
+      - name: Configure for Limbo PC Emulator
+        run: |
+          mkdir build && cd build
+          # 'fluxbox' বা 'openbox' ব্যবহার করা হয়েছে কারণ এগুলো Limbo-তে দ্রুত চলে
+          lb config --binary-images iso-hybrid --distribution bookworm --architectures i386 \
+                    --archive-areas "main contrib non-free" \
+                    --apt-recommends false
+
+          # --- X Store এবং UI কনফিগারেশন ---
+          mkdir -p config/includes.chroot/usr/local/bin/
+          mkdir -p config/package-lists/
+
+          # হালকা ডেস্কটপ প্যাকেজ যোগ করা
+          echo "fluxbox xterm xserver-xorg xinit" > config/package-lists/desktop.list.chroot
+
+          # X Store স্ক্রিপ্ট তৈরি
+          cat <<EOF > config/includes.chroot/usr/local/bin/xstore
+          #!/bin/bash
+          clear
+          echo "================================"
+          echo "   XTREME STORE for LIMBO       "
+          echo "================================"
+          echo "1. Install Nano Editor"
+          echo "2. Install Calculator"
+          echo "3. Update Xtreme OS"
+          read -p "Select: " opt
+          case \$opt in
+            1) sudo apt install -y nano ;;
+            2) sudo apt install -y xcalc ;;
+            3) sudo apt update ;;
+            *) echo "Invalid option" ;;
+          esac
+          EOF
+
+          chmod +x config/includes.chroot/usr/local/bin/xstore
+
+      - name: Generate ISO
+        run: |
+          cd build
+          sudo lb build
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v3
+        with:
+          name: XtremeOS-Limbo-ISO
+          path: build/*.iso
+          
